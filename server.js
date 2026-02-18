@@ -62,9 +62,9 @@ function buildClient() {
         '--window-size=1280,800',
       ],
     },
-    // Always fetch the latest WhatsApp Web version — fixes QR compatibility
-    webVersionCache: { type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1015901307.html' },
+    // Use live WhatsApp Web — when cache is empty the library loads directly
+    // from web.whatsapp.com so the version is always current and valid
+    webVersionCache: { type: 'local' },
     restartOnAuthFail: false,
   });
 
@@ -138,20 +138,35 @@ app.get('/api/status', (_, res) => res.json({
 
 // Pairing code — lets the user link on the SAME phone (no QR scan needed)
 app.post('/api/pair', async (req, res) => {
-  if (whatsappReady)       return res.status(400).json({ error: 'Already connected.' });
-  if (clientPhase !== 'qr') return res.status(400).json({ error: 'Not ready yet — wait for the QR to load first, then try again.' });
+  if (whatsappReady)        return res.status(400).json({ error: 'Already connected.' });
+  if (clientPhase !== 'qr') return res.status(400).json({ error: 'Not ready yet — wait for the QR to appear first, then try again.' });
+  if (!client.pupPage)      return res.status(400).json({ error: 'Browser not ready yet, please wait.' });
 
   const clean = String(req.body.phone || '').replace(/\D/g, '');
   if (!clean || clean.length < 7 || clean.length > 15)
-    return res.status(400).json({ error: 'Enter your full number with country code (digits only, no + or spaces).' });
+    return res.status(400).json({ error: 'Enter your full number with country code — digits only, no + or spaces.' });
 
   try {
-    const code = await client.requestPairingCode(clean);
-    console.log(`[pair] issued for ${clean.slice(0,3)}***`);
-    res.json({ code: String(code).replace(/\W/g, '') });
+    // In wwebjs v1.34+ requestPairingCode requires window.onCodeReceivedEvent to be
+    // registered on the puppeteer page. It is only done automatically when the
+    // pairWithPhoneNumber CLIENT OPTION is set. When calling the method standalone
+    // (our case) we must register it ourselves first, otherwise it throws.
+    await client.pupPage
+      .exposeFunction('onCodeReceivedEvent', (code) => code)
+      .catch(() => { /* already registered — that's fine */ });
+
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timed out waiting for pairing code — please try again.')), 30000)
+    );
+    const code = await Promise.race([client.requestPairingCode(clean), timeout]);
+    const display = String(code).replace(/\W/g, '').toUpperCase();
+    if (!display || display.length < 6)
+      throw new Error('WhatsApp returned an empty code — please wait a few seconds and try again.');
+    console.log(`[pair] code issued for ${clean.slice(0, 3)}***`);
+    res.json({ code: display });
   } catch (e) {
-    console.error('[pair]', e.message);
-    res.status(500).json({ error: 'Could not get code: ' + e.message });
+    console.error('[pair] error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
