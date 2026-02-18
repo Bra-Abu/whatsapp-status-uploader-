@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#25D366" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="WA Status" />
   <title>WhatsApp Status Uploader</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -16,7 +20,7 @@
           <path d="M22.5 9.5A9 9 0 0 0 7.1 20.6L6 26l5.6-1.1a9 9 0 0 0 10.9-15.4z" fill="#fff"/>
           <path d="M12.5 11.5c-.3-.7-.6-.7-.9-.7h-.8c-.3 0-.7.1-1 .5-.4.4-1.4 1.3-1.4 3.2s1.4 3.7 1.6 4c.2.2 2.8 4.3 6.8 5.9 3.4 1.3 4 1 4.7.9.7-.1 2.3-.9 2.6-1.8.3-.9.3-1.7.2-1.8-.1-.2-.4-.3-.8-.5s-2.3-1.1-2.6-1.2c-.4-.1-.6-.2-.9.1-.2.3-.9 1.2-1.1 1.4-.2.2-.4.3-.8.1-.4-.2-1.6-.6-3-1.9-1.1-1-1.8-2.2-2-2.6-.2-.4 0-.6.2-.8l.5-.6c.2-.2.2-.4.4-.6.1-.3 0-.5-.1-.7-.2-.3-.9-2.1-1.2-2.9z" fill="#25D366"/>
         </svg>
-        <span>WhatsApp Status Uploader</span>
+        <span>WA Status Uploader</span>
       </div>
       <div id="connection-badge" class="badge disconnected">Disconnected</div>
     </header>
@@ -33,7 +37,7 @@
       <p id="qr-msg" class="qr-msg">Starting WhatsApp browser, please wait…</p>
 
       <p class="steps">
-        <strong>Steps:</strong> Open WhatsApp → 3 dots (⋮) → Linked Devices → Link a Device → Scan QR
+        <strong>Steps:</strong> Open WhatsApp &rarr; 3 dots (&#8942;) &rarr; Linked Devices &rarr; Link a Device &rarr; Scan QR
       </p>
     </section>
 
@@ -47,8 +51,8 @@
 
       <div id="drop-zone" class="drop-zone">
         <div class="drop-icon">&#128247;</div>
-        <p>Drag &amp; drop images here, or</p>
-        <label for="file-input" class="btn btn-outline">Browse Files</label>
+        <p id="drop-text">Tap or drag images here, or</p>
+        <label for="file-input" id="browse-label" class="btn btn-outline">Select Photos</label>
         <input id="file-input" type="file" multiple accept="image/*" hidden />
         <p class="hint">JPEG, PNG, WEBP &middot; Up to 30 images &middot; 16 MB each</p>
       </div>

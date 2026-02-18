@@ -179,6 +179,12 @@ function updateUI() {
   uploadBtn.disabled = !hasFiles || uploadDone || isUploading;
 }
 
+// Adapt drop zone text for touch-only devices
+if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+  const dropText = document.getElementById('drop-text');
+  if (dropText) dropText.textContent = 'Tap to select photos, or';
+}
+
 fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
 
 dropZone.addEventListener('click', (e) => {
