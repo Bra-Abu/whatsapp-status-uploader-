@@ -135,12 +135,13 @@ io.on('connection', (socket) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Polled by the browser every few seconds as a reliable fallback
+// Includes the QR data URL so polling alone is enough to show the code
 app.get('/api/status', (req, res) => {
   res.json({
     phase: clientPhase,
     ready: whatsappReady,
     name: clientName || null,
-    hasQR: !!latestQRDataUrl,
+    qr: latestQRDataUrl || null,
   });
 });
 

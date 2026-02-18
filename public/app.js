@@ -101,8 +101,8 @@ socket.on('upload-progress', ({ current, total, filename, success, error }) => {
 async function pollStatus() {
   if (isConnected) return;
   try {
-    const { phase, name, hasQR } = await fetch('/api/status').then((r) => r.json());
-    applyPhase({ phase, name });
+    const { phase, name, qr } = await fetch('/api/status').then((r) => r.json());
+    applyPhase({ phase, name, qr });
   } catch (_) { /* ignore */ }
 }
 
