@@ -1,221 +1,196 @@
 const express = require('express');
-const http = require('http');
+const http    = require('http');
 const { Server } = require('socket.io');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const qrcode = require('qrcode');
+const multer  = require('multer');
+const path    = require('path');
+const fs      = require('fs');
+const qrcode  = require('qrcode');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io     = new Server(server);
 
-const PORT = 3000;
+const PORT       = process.env.PORT || 3000;
+const AUTH_DIR   = path.join(__dirname, '.wwebjs_auth');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // ─── Multer ────────────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e6)}${path.extname(file.originalname)}`);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.diskStorage({
+    destination: (_, __, cb) => cb(null, UPLOADS_DIR),
+    filename:    (_, file, cb) =>
+      cb(null, `${Date.now()}-${Math.round(Math.random()*1e6)}${path.extname(file.originalname)}`),
+  }),
   limits: { fileSize: 16 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) return cb(null, true);
-    cb(new Error('Only image files are allowed'));
-  },
+  fileFilter: (_, file, cb) =>
+    file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Images only')),
 });
 
 // ─── WhatsApp state ────────────────────────────────────────────────────────────
-// These are cached so ANY newly-connected browser socket gets the current state immediately.
-let whatsappReady = false;
-let latestQRDataUrl = null;   // cached QR image so refreshed pages still see it
-let clientName = '';
-let clientPhase = 'init';     // 'init' | 'qr' | 'authenticated' | 'ready' | 'failed'
+let whatsappReady  = false;
+let latestQRDataUrl = null;
+let clientName     = '';
+let clientPhase    = 'init';
 
 function broadcastPhase(phase, extra = {}) {
   clientPhase = phase;
   io.emit('wa-phase', { phase, ...extra });
-  console.log('[WA phase]', phase, extra);
+  console.log('[WA]', phase, JSON.stringify(extra).slice(0, 80));
 }
 
-// ─── WhatsApp client ───────────────────────────────────────────────────────────
-const client = new Client({
-  authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
-  puppeteer: {
-    headless: true,
-    // On Linux servers (Render, Railway, etc.) set PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--window-size=1280,800',
-    ],
-  },
-  restartOnAuthFail: false,
-});
+function clearSession() {
+  try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch (_) {}
+  console.log('[WA] session cleared');
+}
 
-client.on('qr', async (qr) => {
-  try {
-    latestQRDataUrl = await qrcode.toDataURL(qr, { scale: 6 });
-    whatsappReady = false;
-    broadcastPhase('qr', { qr: latestQRDataUrl });
-  } catch (err) {
-    console.error('QR generation error:', err);
-  }
-});
+// ─── Build WhatsApp client ─────────────────────────────────────────────────────
+function buildClient() {
+  const c = new Client({
+    authStrategy: new LocalAuth({ dataPath: AUTH_DIR }),
+    puppeteer: {
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--window-size=1280,800',
+      ],
+    },
+    // Always fetch the latest WhatsApp Web version — fixes QR compatibility
+    webVersionCache: { type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1015901307.html' },
+    restartOnAuthFail: false,
+  });
 
-client.on('authenticated', () => {
-  latestQRDataUrl = null; // QR no longer valid
-  broadcastPhase('authenticated');
-});
+  c.on('qr', async (qr) => {
+    try {
+      latestQRDataUrl = await qrcode.toDataURL(qr, { scale: 6 });
+      whatsappReady   = false;
+      broadcastPhase('qr', { qr: latestQRDataUrl });
+    } catch (e) { console.error('[QR gen]', e.message); }
+  });
 
-client.on('ready', () => {
-  whatsappReady = true;
-  latestQRDataUrl = null;
-  clientName = client.info?.pushname || 'User';
-  broadcastPhase('ready', { name: clientName });
-});
+  c.on('authenticated', () => {
+    latestQRDataUrl = null;
+    broadcastPhase('authenticated');
+  });
 
-client.on('auth_failure', (msg) => {
-  whatsappReady = false;
-  latestQRDataUrl = null;
-  console.error('[WA] Auth failure:', msg);
-  broadcastPhase('failed', { reason: 'Auth failed. Please restart the server.' });
-});
+  c.on('ready', () => {
+    whatsappReady   = true;
+    latestQRDataUrl = null;
+    clientName      = c.info?.pushname || 'User';
+    broadcastPhase('ready', { name: clientName });
+  });
 
-client.on('disconnected', (reason) => {
-  whatsappReady = false;
-  latestQRDataUrl = null;
-  console.log('[WA] Disconnected:', reason);
-  broadcastPhase('failed', { reason: 'WhatsApp disconnected: ' + reason });
-});
+  // Auth failure → clear stale session → restart process (Render restarts it automatically)
+  c.on('auth_failure', (msg) => {
+    console.error('[WA] auth_failure:', msg);
+    broadcastPhase('failed', { reason: 'Session expired — reconnecting…' });
+    clearSession();
+    setTimeout(() => process.exit(1), 1500);
+  });
 
-console.log('[WA] Initializing client (browser starting, please wait ~30s)…');
-client.initialize();
+  // Disconnected → restart process so a fresh QR is generated
+  c.on('disconnected', (reason) => {
+    console.log('[WA] disconnected:', reason);
+    broadcastPhase('failed', { reason: `Disconnected (${reason}) — reconnecting…` });
+    clearSession();
+    setTimeout(() => process.exit(1), 1500);
+  });
+
+  return c;
+}
+
+let client = buildClient();
+console.log('[WA] initializing…');
+client.initialize().catch((e) => {
+  console.error('[WA] init error:', e.message);
+  clearSession();
+  setTimeout(() => process.exit(1), 1500);
+});
 
 // ─── Socket.IO ──────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log('[socket] connected:', socket.id);
-
-  // Immediately bring this socket up to speed with the current state
-  if (clientPhase === 'ready') {
-    socket.emit('wa-phase', { phase: 'ready', name: clientName });
-  } else if (clientPhase === 'qr' && latestQRDataUrl) {
-    socket.emit('wa-phase', { phase: 'qr', qr: latestQRDataUrl });
-  } else if (clientPhase === 'authenticated') {
-    socket.emit('wa-phase', { phase: 'authenticated' });
-  } else if (clientPhase === 'failed') {
-    socket.emit('wa-phase', { phase: 'failed', reason: 'Connection failed. Please restart.' });
-  } else {
-    // Still initializing
-    socket.emit('wa-phase', { phase: 'init' });
-  }
-
-  socket.on('disconnect', () => {
-    console.log('[socket] disconnected:', socket.id);
-  });
+  // Push current state to newly connected browser immediately
+  if      (clientPhase === 'ready')         socket.emit('wa-phase', { phase: 'ready', name: clientName });
+  else if (clientPhase === 'qr' && latestQRDataUrl) socket.emit('wa-phase', { phase: 'qr', qr: latestQRDataUrl });
+  else if (clientPhase === 'authenticated') socket.emit('wa-phase', { phase: 'authenticated' });
+  else if (clientPhase === 'failed')        socket.emit('wa-phase', { phase: 'failed', reason: 'Reconnecting…' });
+  else                                      socket.emit('wa-phase', { phase: 'init' });
 });
 
 // ─── REST API ──────────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Polled by the browser every few seconds as a reliable fallback
-// Includes the QR data URL so polling alone is enough to show the code
-app.get('/api/status', (req, res) => {
-  res.json({
-    phase: clientPhase,
-    ready: whatsappReady,
-    name: clientName || null,
-    qr: latestQRDataUrl || null,
-  });
-});
+app.get('/api/status', (_, res) => res.json({
+  phase: clientPhase,
+  ready: whatsappReady,
+  name:  clientName || null,
+  qr:    latestQRDataUrl || null,
+}));
 
-// Request a pairing code so the user can link on the same phone (no QR scan needed)
+// Pairing code — lets the user link on the SAME phone (no QR scan needed)
 app.post('/api/pair', async (req, res) => {
-  if (whatsappReady) return res.status(400).json({ error: 'Already connected.' });
-  if (clientPhase !== 'qr') {
-    return res.status(400).json({ error: 'WhatsApp is not ready for pairing yet. Please wait a moment and try again.' });
-  }
+  if (whatsappReady)       return res.status(400).json({ error: 'Already connected.' });
+  if (clientPhase !== 'qr') return res.status(400).json({ error: 'Not ready yet — wait for the QR to load first, then try again.' });
 
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Phone number is required.' });
-
-  const cleanPhone = String(phone).replace(/\D/g, '');
-  if (cleanPhone.length < 7 || cleanPhone.length > 15) {
-    return res.status(400).json({ error: 'Invalid phone number. Include country code, digits only.' });
-  }
+  const clean = String(req.body.phone || '').replace(/\D/g, '');
+  if (!clean || clean.length < 7 || clean.length > 15)
+    return res.status(400).json({ error: 'Enter your full number with country code (digits only, no + or spaces).' });
 
   try {
-    const code = await client.requestPairingCode(cleanPhone);
-    console.log(`[pair] code issued for ${cleanPhone.slice(0, 3)}***`);
-    res.json({ code });
-  } catch (err) {
-    console.error('[pair] error:', err.message);
-    res.status(500).json({ error: err.message });
+    const code = await client.requestPairingCode(clean);
+    console.log(`[pair] issued for ${clean.slice(0,3)}***`);
+    res.json({ code: String(code).replace(/\W/g, '') });
+  } catch (e) {
+    console.error('[pair]', e.message);
+    res.status(500).json({ error: 'Could not get code: ' + e.message });
   }
 });
 
-// Upload images → post to WhatsApp status one by one
+// Manual reset — clears session and restarts
+app.post('/api/reset', (_, res) => {
+  res.json({ ok: true, message: 'Resetting…' });
+  clearSession();
+  setTimeout(() => process.exit(1), 500);
+});
+
+// Upload images to WhatsApp Status
 app.post('/api/upload', upload.array('images', 30), async (req, res) => {
-  if (!whatsappReady) {
-    cleanupFiles(req.files);
-    return res.status(400).json({ error: 'WhatsApp is not connected yet.' });
-  }
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: 'No images uploaded.' });
-  }
+  if (!whatsappReady) { cleanupFiles(req.files); return res.status(400).json({ error: 'WhatsApp not connected.' }); }
+  if (!req.files?.length)                         return res.status(400).json({ error: 'No images provided.' });
 
   const socketId = req.headers['x-socket-id'];
-  const results = [];
+  const results  = [];
 
   for (let i = 0; i < req.files.length; i++) {
-    const file = req.files[i];
+    const file     = req.files[i];
     const progress = { current: i + 1, total: req.files.length, filename: file.originalname };
-
     try {
       const media = MessageMedia.fromFilePath(file.path);
-      await client.sendMessage('status@broadcast', media, {
-        caption: req.body.caption || '',
-      });
+      await client.sendMessage('status@broadcast', media, { caption: req.body.caption || '' });
       results.push({ filename: file.originalname, success: true });
       io.to(socketId).emit('upload-progress', { ...progress, success: true });
-    } catch (err) {
-      console.error(`[upload] failed ${file.originalname}:`, err.message);
-      results.push({ filename: file.originalname, success: false, error: err.message });
-      io.to(socketId).emit('upload-progress', { ...progress, success: false, error: err.message });
+    } catch (e) {
+      results.push({ filename: file.originalname, success: false, error: e.message });
+      io.to(socketId).emit('upload-progress', { ...progress, success: false, error: e.message });
     } finally {
       fs.unlink(file.path, () => {});
     }
-
-    if (i < req.files.length - 1) {
-      await new Promise((r) => setTimeout(r, 1500));
-    }
+    if (i < req.files.length - 1) await new Promise(r => setTimeout(r, 1500));
   }
 
-  const succeeded = results.filter((r) => r.success).length;
+  const succeeded = results.filter(r => r.success).length;
   res.json({ total: results.length, succeeded, failed: results.length - succeeded, results });
 });
 
-function cleanupFiles(files = []) {
-  files.forEach((f) => fs.unlink(f.path, () => {}));
-}
+function cleanupFiles(files = []) { files.forEach(f => fs.unlink(f.path, () => {})); }
 
-server.listen(PORT, () => {
-  console.log(`[server] http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`[server] http://localhost:${PORT}`));

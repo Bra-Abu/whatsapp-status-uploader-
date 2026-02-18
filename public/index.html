@@ -25,86 +25,86 @@
       <div id="connection-badge" class="badge disconnected">Disconnected</div>
     </header>
 
-    <!-- ── Connect Section ── -->
+    <!-- ══ CONNECT CARD ══ -->
     <section id="qr-section" class="card">
       <h2>Connect WhatsApp</h2>
-      <p class="hint" id="connect-hint">Choose how to link your account.</p>
 
       <!-- Tabs -->
       <div class="auth-tabs">
-        <button class="tab-btn" id="tab-qr-btn"    data-tab="qr">QR Code</button>
-        <button class="tab-btn" id="tab-phone-btn" data-tab="phone">Phone Number</button>
+        <button class="tab-btn" id="tab-qr-btn"    data-tab="qr">📷 Scan QR</button>
+        <button class="tab-btn" id="tab-phone-btn" data-tab="phone">📱 Same Phone</button>
       </div>
 
-      <!-- QR tab -->
+      <!-- ── QR tab ── -->
       <div id="tab-qr" class="tab-panel">
-        <div id="qr-container">
-          <div class="spinner"></div>
-        </div>
+        <p class="tab-desc">Scan this QR from <strong>another phone or device</strong>.</p>
+        <div id="qr-container"><div class="spinner"></div></div>
         <p id="qr-msg" class="qr-msg">Starting WhatsApp, please wait…</p>
         <p class="steps">
-          <strong>Steps:</strong> Open WhatsApp &rarr; 3 dots (&#8942;) &rarr;
-          Linked Devices &rarr; Link a Device &rarr; Scan QR
+          WhatsApp &rarr; 3 dots (&#8942;) &rarr; Linked Devices &rarr; Link a Device &rarr; Scan
         </p>
       </div>
 
-      <!-- Phone number tab -->
+      <!-- ── Same-phone tab ── -->
       <div id="tab-phone" class="tab-panel hidden">
-        <p class="tab-desc">
-          Enter your WhatsApp number with country code to get an 8-digit pairing code.
-          No QR scan needed — perfect when using the same phone.
-        </p>
+        <div class="same-phone-banner">
+          Using this app on the <strong>same phone as WhatsApp</strong>?<br>
+          Enter your number below — no QR scan needed.
+        </div>
 
         <div class="pair-form">
           <input id="phone-input" type="tel" inputmode="numeric"
-                 placeholder="e.g. 233241234567" autocomplete="tel" />
+                 placeholder="233241234567" autocomplete="tel" />
           <button id="pair-btn" class="btn btn-primary">Get Code</button>
         </div>
+        <p class="pair-hint">Full number with country code, digits only — no + or spaces.<br>
+          e.g. <strong>233</strong>241234567 &nbsp;(Ghana &nbsp;+233)</p>
 
-        <p class="pair-hint">Include country code, no + or spaces. e.g. <strong>233</strong> for Ghana</p>
-
-        <!-- Code display -->
+        <!-- Code display box -->
         <div id="pair-result" class="pair-result hidden">
-          <p class="pair-result-label">Enter this code in WhatsApp:</p>
+          <p class="pair-result-label">Enter this code in WhatsApp on this phone:</p>
           <div id="pair-code-value" class="pair-code-value">---- ----</div>
-          <p class="pair-result-steps">
-            WhatsApp &rarr; Linked Devices &rarr; Link a Device &rarr;
-            <strong>Link with phone number instead</strong> &rarr; type the code above
-          </p>
-          <button id="pair-refresh-btn" class="btn btn-outline pair-refresh">Get New Code</button>
+          <ol class="pair-steps">
+            <li>Open <strong>WhatsApp</strong> on this phone</li>
+            <li>Tap <strong>3 dots (⋮)</strong> → <strong>Linked Devices</strong></li>
+            <li>Tap <strong>Link a Device</strong></li>
+            <li>Tap <strong>"Link with phone number instead"</strong></li>
+            <li>Type the <strong>8-digit code</strong> shown above</li>
+          </ol>
+          <button id="pair-refresh-btn" class="btn btn-outline pair-refresh">Get a New Code</button>
         </div>
+
+        <p id="pair-status-msg" class="qr-msg"></p>
       </div>
     </section>
 
-    <!-- ── Upload Section ── -->
+    <!-- ══ UPLOAD CARD ══ -->
     <section id="upload-section" class="card hidden">
       <h2>Upload Images to Status</h2>
 
       <div class="caption-row">
-        <input id="caption" type="text" placeholder="Optional caption for all images…" maxlength="700" />
+        <input id="caption" type="text" placeholder="Optional caption…" maxlength="700" />
       </div>
 
       <div id="drop-zone" class="drop-zone">
-        <div class="drop-icon">&#128247;</div>
-        <p id="drop-text">Tap or drag images here, or</p>
+        <div class="drop-icon">📷</div>
+        <p id="drop-text">Tap to select photos, or drag &amp; drop</p>
         <label for="file-input" class="btn btn-outline">Select Photos</label>
         <input id="file-input" type="file" multiple accept="image/*" hidden />
-        <p class="hint">JPEG, PNG, WEBP &middot; Up to 30 images &middot; 16 MB each</p>
+        <p class="hint">JPEG · PNG · WEBP &nbsp;|&nbsp; up to 30 images &nbsp;|&nbsp; 16 MB each</p>
       </div>
 
       <div id="preview-grid" class="preview-grid hidden"></div>
 
       <div id="action-row" class="action-row hidden">
         <button id="clear-btn" class="btn btn-outline">Clear All</button>
-        <button id="upload-btn" class="btn btn-primary">
+        <button id="upload-btn" class="btn btn-primary" disabled>
           <span id="upload-btn-text">Upload to Status</span>
         </button>
       </div>
 
       <div id="progress-section" class="progress-section hidden">
-        <div class="progress-bar-wrap">
-          <div id="progress-bar" class="progress-bar"></div>
-        </div>
+        <div class="progress-bar-wrap"><div id="progress-bar" class="progress-bar"></div></div>
         <p id="progress-text">0 / 0 uploaded</p>
         <ul id="results-list" class="results-list"></ul>
       </div>
@@ -114,8 +114,7 @@
   </div>
 
   <footer class="powered-by">
-    Powered by <strong>Tuffguy</strong>
-    &middot;
+    Powered by <strong>Tuffguy</strong> &middot;
     <a href="mailto:tuffguy6532@gmail.com">tuffguy6532@gmail.com</a>
   </footer>
 
