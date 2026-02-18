@@ -132,6 +132,7 @@ io.on('connection', (socket) => {
 });
 
 // ─── REST API ──────────────────────────────────────────────────────────────────
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Polled by the browser every few seconds as a reliable fallback
@@ -143,6 +144,31 @@ app.get('/api/status', (req, res) => {
     name: clientName || null,
     qr: latestQRDataUrl || null,
   });
+});
+
+// Request a pairing code so the user can link on the same phone (no QR scan needed)
+app.post('/api/pair', async (req, res) => {
+  if (whatsappReady) return res.status(400).json({ error: 'Already connected.' });
+  if (clientPhase !== 'qr') {
+    return res.status(400).json({ error: 'WhatsApp is not ready for pairing yet. Please wait a moment and try again.' });
+  }
+
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'Phone number is required.' });
+
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  if (cleanPhone.length < 7 || cleanPhone.length > 15) {
+    return res.status(400).json({ error: 'Invalid phone number. Include country code, digits only.' });
+  }
+
+  try {
+    const code = await client.requestPairingCode(cleanPhone);
+    console.log(`[pair] code issued for ${cleanPhone.slice(0, 3)}***`);
+    res.json({ code });
+  } catch (err) {
+    console.error('[pair] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Upload images → post to WhatsApp status one by one

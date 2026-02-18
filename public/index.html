@@ -25,23 +25,58 @@
       <div id="connection-badge" class="badge disconnected">Disconnected</div>
     </header>
 
-    <!-- QR Section -->
+    <!-- ── Connect Section ── -->
     <section id="qr-section" class="card">
       <h2>Connect WhatsApp</h2>
-      <p class="hint">Scan the QR code with your phone to link your account.</p>
+      <p class="hint" id="connect-hint">Choose how to link your account.</p>
 
-      <div id="qr-container">
-        <div class="spinner"></div>
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="tab-btn" id="tab-qr-btn"    data-tab="qr">QR Code</button>
+        <button class="tab-btn" id="tab-phone-btn" data-tab="phone">Phone Number</button>
       </div>
 
-      <p id="qr-msg" class="qr-msg">Starting WhatsApp browser, please wait…</p>
+      <!-- QR tab -->
+      <div id="tab-qr" class="tab-panel">
+        <div id="qr-container">
+          <div class="spinner"></div>
+        </div>
+        <p id="qr-msg" class="qr-msg">Starting WhatsApp, please wait…</p>
+        <p class="steps">
+          <strong>Steps:</strong> Open WhatsApp &rarr; 3 dots (&#8942;) &rarr;
+          Linked Devices &rarr; Link a Device &rarr; Scan QR
+        </p>
+      </div>
 
-      <p class="steps">
-        <strong>Steps:</strong> Open WhatsApp &rarr; 3 dots (&#8942;) &rarr; Linked Devices &rarr; Link a Device &rarr; Scan QR
-      </p>
+      <!-- Phone number tab -->
+      <div id="tab-phone" class="tab-panel hidden">
+        <p class="tab-desc">
+          Enter your WhatsApp number with country code to get an 8-digit pairing code.
+          No QR scan needed — perfect when using the same phone.
+        </p>
+
+        <div class="pair-form">
+          <input id="phone-input" type="tel" inputmode="numeric"
+                 placeholder="e.g. 233241234567" autocomplete="tel" />
+          <button id="pair-btn" class="btn btn-primary">Get Code</button>
+        </div>
+
+        <p class="pair-hint">Include country code, no + or spaces. e.g. <strong>233</strong> for Ghana</p>
+
+        <!-- Code display -->
+        <div id="pair-result" class="pair-result hidden">
+          <p class="pair-result-label">Enter this code in WhatsApp:</p>
+          <div id="pair-code-value" class="pair-code-value">---- ----</div>
+          <p class="pair-result-steps">
+            WhatsApp &rarr; Linked Devices &rarr; Link a Device &rarr;
+            <strong>Link with phone number instead</strong> &rarr; type the code above
+          </p>
+          <button id="pair-refresh-btn" class="btn btn-outline pair-refresh">Get New Code</button>
+        </div>
+      </div>
     </section>
 
-    <!-- Upload Section (hidden until connected) -->
+    <!-- ── Upload Section ── -->
     <section id="upload-section" class="card hidden">
       <h2>Upload Images to Status</h2>
 
@@ -52,7 +87,7 @@
       <div id="drop-zone" class="drop-zone">
         <div class="drop-icon">&#128247;</div>
         <p id="drop-text">Tap or drag images here, or</p>
-        <label for="file-input" id="browse-label" class="btn btn-outline">Select Photos</label>
+        <label for="file-input" class="btn btn-outline">Select Photos</label>
         <input id="file-input" type="file" multiple accept="image/*" hidden />
         <p class="hint">JPEG, PNG, WEBP &middot; Up to 30 images &middot; 16 MB each</p>
       </div>
